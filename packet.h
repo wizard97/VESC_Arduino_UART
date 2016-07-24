@@ -30,7 +30,7 @@
 // Settings
 #define PACKET_RX_TIMEOUT		100
 //#define PACKET_HANDLERS			1
-//#define PACKET_MAX_PL_LEN		512
+#define PACKET_MAX_PL_LEN		100
 
 typedef struct {
 	volatile unsigned char rx_state;

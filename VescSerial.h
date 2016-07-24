@@ -10,7 +10,9 @@
 #include "packet.h"
 #include "crc.h"
 
-#define VESC_BAUD_RATE 9600;
+#define VESC_BAUD_RATE 9600
+
+const char* bldc_interface_fault_to_string(mc_fault_code fault);
 
 class VescSerial
 {
@@ -22,12 +24,12 @@ public:
     //setters
     void setCurrent(float current);
     void setCurrentBrake(float current);
-    void setRPM(uin32_t rpm);
+    void setRPM(uint32_t rpm);
     void reboot();
 
     //Getters, the msgHandler will be invoked when it suceeds
     void requestValues();
-    void requestVersion()
+    void requestVersion();
 
 protected:
     void sendPacket(unsigned char *data, unsigned int len);
@@ -40,17 +42,4 @@ private:
     void (*_msgHandler)(COMM_PACKET_ID type, void *msg);
 };
 
-//helpers
-const char* bldc_interface_fault_to_string(mc_fault_code fault) {
-	switch (fault) {
-	case FAULT_CODE_NONE: return "FAULT_CODE_NONE";
-	case FAULT_CODE_OVER_VOLTAGE: return "FAULT_CODE_OVER_VOLTAGE";
-	case FAULT_CODE_UNDER_VOLTAGE: return "FAULT_CODE_UNDER_VOLTAGE";
-	case FAULT_CODE_DRV8302: return "FAULT_CODE_DRV8302";
-	case FAULT_CODE_ABS_OVER_CURRENT: return "FAULT_CODE_ABS_OVER_CURRENT";
-	case FAULT_CODE_OVER_TEMP_FET: return "FAULT_CODE_OVER_TEMP_FET";
-	case FAULT_CODE_OVER_TEMP_MOTOR: return "FAULT_CODE_OVER_TEMP_MOTOR";
-	default: return "Unknown fault";
-	}
-}
 #endif

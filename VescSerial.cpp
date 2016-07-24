@@ -1,5 +1,19 @@
 #include "VescSerial.h"
 
+//helpers
+const char* bldc_interface_fault_to_string(mc_fault_code fault) {
+	switch (fault) {
+	case FAULT_CODE_NONE: return "FAULT_CODE_NONE";
+	case FAULT_CODE_OVER_VOLTAGE: return "FAULT_CODE_OVER_VOLTAGE";
+	case FAULT_CODE_UNDER_VOLTAGE: return "FAULT_CODE_UNDER_VOLTAGE";
+	case FAULT_CODE_DRV8302: return "FAULT_CODE_DRV8302";
+	case FAULT_CODE_ABS_OVER_CURRENT: return "FAULT_CODE_ABS_OVER_CURRENT";
+	case FAULT_CODE_OVER_TEMP_FET: return "FAULT_CODE_OVER_TEMP_FET";
+	case FAULT_CODE_OVER_TEMP_MOTOR: return "FAULT_CODE_OVER_TEMP_MOTOR";
+	default: return "Unknown fault";
+	}
+}
+
 VescSerial::VescSerial(SoftwareSerial &serial, void (*msgHandler)(COMM_PACKET_ID type, void *msg))
 : _serial(serial), _msgHandler(msgHandler)
 {
@@ -15,24 +29,24 @@ void VescSerial::begin(uint16_t baud)
 void VescSerial::requestVersion()
 {
     unsigned char buf[1];
-    int32_t send_index = 0;
-    send_buffer[send_index++] = COMM_FW_VERSION;
+    int16_t send_index = 0;
+    buf[send_index++] = COMM_FW_VERSION;
     sendPacket(buf, send_index);
 }
 
 void VescSerial::requestValues()
 {
     unsigned char buf[1];
-    int32_t send_index = 0;
-	send_buffer[send_index++] = COMM_GET_VALUES;
+    int16_t send_index = 0;
+	buf[send_index++] = COMM_GET_VALUES;
 	sendPacket(buf, send_index);
 }
 
 void VescSerial::setCurrent(float current)
 {
     unsigned char buf[5];
-    int32_t send_index = 0;
-	send_buffer[send_index++] = COMM_SET_CURRENT;
+    int16_t send_index = 0;
+	buf[send_index++] = COMM_SET_CURRENT;
 	buffer_append_float32(buf, current, 1000.0, &send_index);
 	sendPacket(buf, send_index);
 }
@@ -41,17 +55,17 @@ void VescSerial::setCurrent(float current)
 void VescSerial::setCurrentBrake(float current)
 {
     unsigned char buf[5];
-    int32_t send_index = 0;
-	send_buffer[send_index++] = COMM_SET_CURRENT_BRAKE;
+    int16_t send_index = 0;
+	buf[send_index++] = COMM_SET_CURRENT_BRAKE;
 	buffer_append_float32(buf, current, 1000.0, &send_index);
 	sendPacket(buf, send_index);
 }
 
-void VescSerial::setRPM(uin32_t rpm)
+void VescSerial::setRPM(uint32_t rpm)
 {
     unsigned char buf[5];
-    int32_t send_index = 0;
-    send_buffer[send_index++] = COMM_SET_RPM;
+    int16_t send_index = 0;
+    buf[send_index++] = COMM_SET_RPM;
     buffer_append_int32(buf, rpm, &send_index);
     sendPacket(buf, send_index);
 }
@@ -59,9 +73,9 @@ void VescSerial::setRPM(uin32_t rpm)
 void VescSerial::reboot()
 {
     unsigned char buf[1];
-    int32_t send_index = 0;
-    send_buffer[send_index++] = COMM_REBOOT;
-    send_packet_no_fwd(buf, send_index);
+    int16_t send_index = 0;
+    buf[send_index++] = COMM_REBOOT;
+    sendPacket(buf, send_index);
 }
 
 
@@ -100,10 +114,10 @@ void VescSerial::processPacket(unsigned char *data, unsigned int len)
     COMM_PACKET_ID type = (COMM_PACKET_ID)data[0];
     len--; data++;
 
+    int16_t ind = 0;
     switch (type)
     {
-        case (COMM_GET_VALUES):
-            int16_t ind = 0;
+        case COMM_GET_VALUES:
             mc_values values;
 
             values.temp_mos1 = buffer_get_float16(data, 10.0, &ind);
@@ -128,7 +142,7 @@ void VescSerial::processPacket(unsigned char *data, unsigned int len)
             _msgHandler(type, &values);
             break;
 
-        case (COMM_FW_VERSION):
+        case COMM_FW_VERSION:
             int fw_ver[2];
             if (len == 2) {
                 ind = 0;
