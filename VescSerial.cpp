@@ -1,15 +1,70 @@
 #include "VescSerial.h"
 
-VescSerial::VescSerial()
+VescSerial::VescSerial(SoftwareSerial &serial, void (*msgHandler)(COMM_PACKET_ID type, void *msg))
+: _serial(serial), _msgHandler(msgHandler)
 {
     _timeout = millis();
     memset(&_packet, 0, sizeof(_packet));
 }
 
-VescSerial::begin(uint16_t baud)
+void VescSerial::begin(uint16_t baud)
 {
     _serial.begin(baud);
 }
+
+void VescSerial::requestVersion()
+{
+    unsigned char buf[1];
+    int32_t send_index = 0;
+    send_buffer[send_index++] = COMM_FW_VERSION;
+    sendPacket(buf, send_index);
+}
+
+void VescSerial::requestValues()
+{
+    unsigned char buf[1];
+    int32_t send_index = 0;
+	send_buffer[send_index++] = COMM_GET_VALUES;
+	sendPacket(buf, send_index);
+}
+
+void VescSerial::setCurrent(float current)
+{
+    unsigned char buf[5];
+    int32_t send_index = 0;
+	send_buffer[send_index++] = COMM_SET_CURRENT;
+	buffer_append_float32(buf, current, 1000.0, &send_index);
+	sendPacket(buf, send_index);
+}
+
+
+void VescSerial::setCurrentBrake(float current)
+{
+    unsigned char buf[5];
+    int32_t send_index = 0;
+	send_buffer[send_index++] = COMM_SET_CURRENT_BRAKE;
+	buffer_append_float32(buf, current, 1000.0, &send_index);
+	sendPacket(buf, send_index);
+}
+
+void VescSerial::setRPM(uin32_t rpm)
+{
+    unsigned char buf[5];
+    int32_t send_index = 0;
+    send_buffer[send_index++] = COMM_SET_RPM;
+    buffer_append_int32(buf, rpm, &send_index);
+    sendPacket(buf, send_index);
+}
+
+void VescSerial::reboot()
+{
+    unsigned char buf[1];
+    int32_t send_index = 0;
+    send_buffer[send_index++] = COMM_REBOOT;
+    send_packet_no_fwd(buf, send_index);
+}
+
+
 
 void VescSerial::sendPacket(unsigned char *data, unsigned int len)
 {
@@ -37,6 +92,59 @@ void VescSerial::sendPacket(unsigned char *data, unsigned int len)
 	_packet.tx_buffer[b_ind++] = 3;
 
     _serial.write(_packet.tx_buffer, b_ind);
+}
+
+
+void VescSerial::processPacket(unsigned char *data, unsigned int len)
+{
+    COMM_PACKET_ID type = (COMM_PACKET_ID)data[0];
+    len--; data++;
+
+    switch (type)
+    {
+        case (COMM_GET_VALUES):
+            int16_t ind = 0;
+            mc_values values;
+
+            values.temp_mos1 = buffer_get_float16(data, 10.0, &ind);
+            values.temp_mos2 = buffer_get_float16(data, 10.0, &ind);
+            values.temp_mos3 = buffer_get_float16(data, 10.0, &ind);
+            values.temp_mos4 = buffer_get_float16(data, 10.0, &ind);
+            values.temp_mos5 = buffer_get_float16(data, 10.0, &ind);
+            values.temp_mos6 = buffer_get_float16(data, 10.0, &ind);
+            values.temp_pcb = buffer_get_float16(data, 10.0, &ind);
+            values.current_motor = buffer_get_float32(data, 100.0, &ind);
+            values.current_in = buffer_get_float32(data, 100.0, &ind);
+            values.duty_now = buffer_get_float16(data, 1000.0, &ind);
+            values.rpm = buffer_get_float32(data, 1.0, &ind);
+            values.v_in = buffer_get_float16(data, 10.0, &ind);
+            values.amp_hours = buffer_get_float32(data, 10000.0, &ind);
+            values.amp_hours_charged = buffer_get_float32(data, 10000.0, &ind);
+            values.watt_hours = buffer_get_float32(data, 10000.0, &ind);
+            values.watt_hours_charged = buffer_get_float32(data, 10000.0, &ind);
+            values.tachometer = buffer_get_int32(data, &ind);
+            values.tachometer_abs = buffer_get_int32(data, &ind);
+            values.fault_code = (mc_fault_code)data[ind++];
+            _msgHandler(type, &values);
+            break;
+
+        case (COMM_FW_VERSION):
+            int fw_ver[2];
+            if (len == 2) {
+                ind = 0;
+                fw_ver[0] = data[ind++]; // major
+                fw_ver[1] = data[ind++]; //minor
+            } else {
+                fw_ver[0] = -1; // major
+                fw_ver[1] = -1; //minor
+            }
+            _msgHandler(type, fw_ver);
+            break;
+
+        default:
+            _msgHandler(type, data); //sensible default
+            break;
+    }
 }
 
 
