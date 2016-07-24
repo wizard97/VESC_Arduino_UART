@@ -28,15 +28,30 @@
 #include <stdint.h>
 
 // Settings
-#define PACKET_RX_TIMEOUT		2
-#define PACKET_HANDLERS			1
-#define PACKET_MAX_PL_LEN		512
+#define PACKET_RX_TIMEOUT		100
+//#define PACKET_HANDLERS			1
+//#define PACKET_MAX_PL_LEN		512
 
+typedef struct {
+	volatile unsigned char rx_state;
+	volatile unsigned char rx_timeout;
+	//void(*send_func)(unsigned char *data, unsigned int len);
+	//void(*process_func)(unsigned char *data, unsigned int len);
+	unsigned int payload_length;
+	unsigned char rx_buffer[PACKET_MAX_PL_LEN];
+	unsigned char tx_buffer[PACKET_MAX_PL_LEN + 6];
+	unsigned int rx_data_ptr;
+	unsigned char crc_low;
+	unsigned char crc_high;
+} PACKET_STATE_t;
+
+/*
 // Functions
 void packet_init(void (*s_func)(unsigned char *data, unsigned int len),
 		void (*p_func)(unsigned char *data, unsigned int len), int handler_num);
 void packet_process_byte(uint8_t rx_data, int handler_num);
 void packet_timerfunc(void);
 void packet_send_packet(unsigned char *data, unsigned int len, int handler_num);
+*/
 
 #endif /* PACKET_H_ */
