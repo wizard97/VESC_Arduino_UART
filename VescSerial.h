@@ -17,8 +17,8 @@ const char* bldc_interface_fault_to_string(mc_fault_code fault);
 class VescSerial
 {
 public:
-    VescSerial(SoftwareSerial &serial, void (*msgHandler)(COMM_PACKET_ID type, void *msg));
-    void begin(uint16_t baud = VESC_BAUD_RATE);
+    VescSerial(SoftwareSerial &serial, void (*msgHandler)(VescSerial &vesc, COMM_PACKET_ID type, void *msg));
+    void begin(uint32_t baud = VESC_BAUD_RATE);
     void service();
 
     //setters
@@ -39,7 +39,7 @@ private:
     PACKET_STATE_t _packet; // from packet.h
     uint32_t _timeout;
 
-    void (*_msgHandler)(COMM_PACKET_ID type, void *msg);
+    void (*_msgHandler)(VescSerial &vesc, COMM_PACKET_ID type, void *msg);
 };
 
 #endif

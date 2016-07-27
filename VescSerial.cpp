@@ -14,14 +14,14 @@ const char* bldc_interface_fault_to_string(mc_fault_code fault) {
 	}
 }
 
-VescSerial::VescSerial(SoftwareSerial &serial, void (*msgHandler)(COMM_PACKET_ID type, void *msg))
+VescSerial::VescSerial(SoftwareSerial &serial, void (*msgHandler)(VescSerial &vesc, COMM_PACKET_ID type, void *msg))
 : _serial(serial), _msgHandler(msgHandler)
 {
     _timeout = millis();
     memset(&_packet, 0, sizeof(_packet));
 }
 
-void VescSerial::begin(uint16_t baud)
+void VescSerial::begin(uint32_t baud)
 {
     _serial.begin(baud);
 }
@@ -139,7 +139,7 @@ void VescSerial::processPacket(unsigned char *data, unsigned int len)
             values.tachometer = buffer_get_int32(data, &ind);
             values.tachometer_abs = buffer_get_int32(data, &ind);
             values.fault_code = (mc_fault_code)data[ind++];
-            _msgHandler(type, &values);
+            _msgHandler(*this, type, &values);
             break;
 
         case COMM_FW_VERSION:
@@ -152,11 +152,11 @@ void VescSerial::processPacket(unsigned char *data, unsigned int len)
                 fw_ver[0] = -1; // major
                 fw_ver[1] = -1; //minor
             }
-            _msgHandler(type, fw_ver);
+            _msgHandler(*this, type, fw_ver);
             break;
 
         default:
-            _msgHandler(type, data); //sensible default
+            _msgHandler(*this, type, data); //sensible default
             break;
     }
 }
