@@ -29,10 +29,16 @@ public:
     bool setRPM(uint32_t rpm);
     bool reboot();
 
+    // Block until SoftwareSerial is freed by another ESC
+    //services the active ESC until VescSerial::usingSerial() return false
+    // This will happen once the ESC gets the message it is waiting for or unti it times out
+    void waitAvailable();
+
+
     //Getters, the msgHandler will be invoked when it suceeds
-    //mc_values getValues() { return _values; }
     bool requestValues();
     bool requestVersion();
+
     uint32_t getLastRecv() { return _lastRecv; }
 
     static bool usingSerial() { return _active; }

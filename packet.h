@@ -28,7 +28,7 @@
 #include <stdint.h>
 
 // Settings
-#define PACKET_RX_TIMEOUT		200
+#define PACKET_RX_TIMEOUT		100
 //#define PACKET_HANDLERS			1
 #define PACKET_MAX_PL_LEN		100
 

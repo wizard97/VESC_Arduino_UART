@@ -237,11 +237,10 @@ bool VescSerial::service()
         }
 		_timeout = millis();
 		return false;
-    } else {
-		_timeout = millis();
-	}
+    }
 
     if (_serial.available()) {
+		_timeout = millis();
         rx_data = _serial.read();
     } else {
         return false;
@@ -346,4 +345,10 @@ bool VescSerial::unlock()
 	_active = NULL;
 	_request = false;
 	return true;
+}
+
+void VescSerial::waitAvailable()
+{
+	while (VescSerial::usingSerial())
+		_active->service();
 }
