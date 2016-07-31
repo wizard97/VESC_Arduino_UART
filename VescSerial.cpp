@@ -19,6 +19,8 @@ VescSerial::VescSerial(SoftwareSerial &serial, void (*msgHandler)(VescSerial &ve
 {
     _timeout = millis();
     memset(&_packet, 0, sizeof(_packet));
+	//memset(&_values, 0, sizeof(_values));
+	_lastRecv = millis();
 }
 
 void VescSerial::begin(uint32_t baud)
@@ -39,6 +41,15 @@ void VescSerial::requestValues()
     unsigned char buf[1];
     int16_t send_index = 0;
 	buf[send_index++] = COMM_GET_VALUES;
+	sendPacket(buf, send_index);
+}
+
+void VescSerial::setDuty(float dutyCycle)
+{
+	unsigned char buf[5];
+	int16_t send_index = 0;
+	buf[send_index++] = COMM_SET_DUTY;
+	buffer_append_float32(buf, dutyCycle, 100000.0, &send_index);
 	sendPacket(buf, send_index);
 }
 
@@ -104,6 +115,7 @@ void VescSerial::sendPacket(unsigned char *data, unsigned int len)
 	_packet.tx_buffer[b_ind++] = (uint8_t)(crc >> 8);
 	_packet.tx_buffer[b_ind++] = (uint8_t)(crc & 0xFF);
 	_packet.tx_buffer[b_ind++] = 3;
+	_packet.tx_buffer[b_ind] = 0;
 
     _serial.write(_packet.tx_buffer, b_ind);
 }
@@ -118,8 +130,7 @@ void VescSerial::processPacket(unsigned char *data, unsigned int len)
     switch (type)
     {
         case COMM_GET_VALUES:
-            mc_values values;
-
+			mc_values values;
             values.temp_mos1 = buffer_get_float16(data, 10.0, &ind);
             values.temp_mos2 = buffer_get_float16(data, 10.0, &ind);
             values.temp_mos3 = buffer_get_float16(data, 10.0, &ind);
@@ -134,11 +145,11 @@ void VescSerial::processPacket(unsigned char *data, unsigned int len)
             values.v_in = buffer_get_float16(data, 10.0, &ind);
             values.amp_hours = buffer_get_float32(data, 10000.0, &ind);
             values.amp_hours_charged = buffer_get_float32(data, 10000.0, &ind);
-            values.watt_hours = buffer_get_float32(data, 10000.0, &ind);
+        	values.watt_hours = buffer_get_float32(data, 10000.0, &ind);
             values.watt_hours_charged = buffer_get_float32(data, 10000.0, &ind);
             values.tachometer = buffer_get_int32(data, &ind);
             values.tachometer_abs = buffer_get_int32(data, &ind);
-            values.fault_code = (mc_fault_code)data[ind++];
+        	values.fault_code = (mc_fault_code)data[ind++];
             _msgHandler(*this, type, &values);
             break;
 
@@ -168,6 +179,7 @@ void VescSerial::service()
     uint8_t rx_data;
 
     // check if timeout
+
     int32_t diff = (int32_t)(millis() - _timeout);
     if (!_serial.available() && diff) {
         if (_packet.rx_timeout)
@@ -177,6 +189,7 @@ void VescSerial::service()
             _packet.rx_timeout = 0;
             _packet.rx_state = 0;
         }
+		_timeout = millis();
     }
 
     if (_serial.available()) {
@@ -248,7 +261,8 @@ void VescSerial::service()
                             | (unsigned short)_packet.crc_low)) {
                 // Packet received!
                 // Skip the start byte and crc
-                processPacket(_packet.rx_buffer+3, _packet.payload_length - 3 -2);
+				_lastRecv = millis();
+                processPacket(_packet.rx_buffer, _packet.payload_length);
 
             }
         }

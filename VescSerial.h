@@ -14,6 +14,7 @@
 
 const char* bldc_interface_fault_to_string(mc_fault_code fault);
 
+
 class VescSerial
 {
 public:
@@ -22,14 +23,17 @@ public:
     void service();
 
     //setters
+    void setDuty(float dutyCycle);
     void setCurrent(float current);
     void setCurrentBrake(float current);
     void setRPM(uint32_t rpm);
     void reboot();
 
     //Getters, the msgHandler will be invoked when it suceeds
+    //mc_values getValues() { return _values; }
     void requestValues();
     void requestVersion();
+    uint32_t getLastRecv() { return _lastRecv; }
 
 protected:
     void sendPacket(unsigned char *data, unsigned int len);
@@ -38,6 +42,9 @@ private:
     SoftwareSerial _serial;
     PACKET_STATE_t _packet; // from packet.h
     uint32_t _timeout;
+    uint32_t _lastRecv;
+
+    //mc_values _values;
 
     void (*_msgHandler)(VescSerial &vesc, COMM_PACKET_ID type, void *msg);
 };
