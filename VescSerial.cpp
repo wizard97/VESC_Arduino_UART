@@ -14,83 +14,124 @@ const char* bldc_interface_fault_to_string(mc_fault_code fault) {
 	}
 }
 
-VescSerial::VescSerial(SoftwareSerial &serial, void (*msgHandler)(VescSerial &vesc, COMM_PACKET_ID type, void *msg))
+VescSerial *VescSerial::_active = NULL;
+
+VescSerial::VescSerial(SoftwareSerial &serial, uint32_t baud, void (*msgHandler)(VescSerial &vesc, COMM_PACKET_ID type, void *msg))
 : _serial(serial), _msgHandler(msgHandler)
 {
-    _timeout = millis();
+	_baud = baud;
+    _timeout = 0;
+	_request = false;
     memset(&_packet, 0, sizeof(_packet));
 	//memset(&_values, 0, sizeof(_values));
 	_lastRecv = millis();
 }
 
-void VescSerial::begin(uint32_t baud)
-{
-    _serial.begin(baud);
-}
 
-void VescSerial::requestVersion()
+bool VescSerial::requestVersion()
 {
+	if (!getLock())
+		return false;
+
+	_request = true;
+
     unsigned char buf[1];
     int16_t send_index = 0;
     buf[send_index++] = COMM_FW_VERSION;
     sendPacket(buf, send_index);
+
+	_timeout = millis();
+	return true; //must unlock later
 }
 
-void VescSerial::requestValues()
+bool VescSerial::requestValues()
 {
+	if (!getLock())
+		return false;
+
+	_request = true;
+
     unsigned char buf[1];
     int16_t send_index = 0;
 	buf[send_index++] = COMM_GET_VALUES;
 	sendPacket(buf, send_index);
+
+	_timeout = millis();
+	return true; //must unlock later
 }
 
-void VescSerial::setDuty(float dutyCycle)
+bool VescSerial::setDuty(float dutyCycle)
 {
+	if (!getLock())
+		return false;
+
 	unsigned char buf[5];
 	int16_t send_index = 0;
 	buf[send_index++] = COMM_SET_DUTY;
 	buffer_append_float32(buf, dutyCycle, 100000.0, &send_index);
 	sendPacket(buf, send_index);
+
+	return unlock();
 }
 
-void VescSerial::setCurrent(float current)
+bool VescSerial::setCurrent(float current)
 {
+	if (!getLock())
+		return false;
+
     unsigned char buf[5];
     int16_t send_index = 0;
 	buf[send_index++] = COMM_SET_CURRENT;
 	buffer_append_float32(buf, current, 1000.0, &send_index);
 	sendPacket(buf, send_index);
+
+	return unlock();
 }
 
 
-void VescSerial::setCurrentBrake(float current)
+bool VescSerial::setCurrentBrake(float current)
 {
+	if (!getLock())
+		return false;
+
     unsigned char buf[5];
     int16_t send_index = 0;
 	buf[send_index++] = COMM_SET_CURRENT_BRAKE;
 	buffer_append_float32(buf, current, 1000.0, &send_index);
 	sendPacket(buf, send_index);
+
+	return unlock();
 }
 
-void VescSerial::setRPM(uint32_t rpm)
+bool VescSerial::setRPM(uint32_t rpm)
 {
+	if (!getLock())
+		return false;
+
     unsigned char buf[5];
     int16_t send_index = 0;
     buf[send_index++] = COMM_SET_RPM;
     buffer_append_int32(buf, rpm, &send_index);
     sendPacket(buf, send_index);
+
+	return unlock();
 }
 
-void VescSerial::reboot()
+bool VescSerial::reboot()
 {
+	if (!getLock())
+		return false;
+
     unsigned char buf[1];
     int16_t send_index = 0;
     buf[send_index++] = COMM_REBOOT;
     sendPacket(buf, send_index);
+
+	return unlock();
 }
 
 
-
+// only call if lock
 void VescSerial::sendPacket(unsigned char *data, unsigned int len)
 {
     if (len > PACKET_MAX_PL_LEN) {
@@ -174,28 +215,36 @@ void VescSerial::processPacket(unsigned char *data, unsigned int len)
 
 
 // State machine
-void VescSerial::service()
+bool VescSerial::service()
 {
+	if (_active != this)
+		return false;
+
     uint8_t rx_data;
 
     // check if timeout
 
-    int32_t diff = (int32_t)(millis() - _timeout);
+    uint32_t diff = (millis() - _timeout);
     if (!_serial.available() && diff) {
         if (_packet.rx_timeout)
-            _packet.rx_timeout -= diff;
+            _packet.rx_timeout--;
 
-        if (_packet.rx_timeout <= 0) {
+        if (_packet.rx_timeout == 0) {
             _packet.rx_timeout = 0;
             _packet.rx_state = 0;
+
+			unlock();
         }
 		_timeout = millis();
-    }
+		return false;
+    } else {
+		_timeout = millis();
+	}
 
     if (_serial.available()) {
         rx_data = _serial.read();
     } else {
-        return;
+        return false;
     }
 
     switch (_packet.rx_state) {
@@ -267,10 +316,34 @@ void VescSerial::service()
             }
         }
         _packet.rx_state = 0;
+		unlock();
         break;
 
     default:
         _packet.rx_state = 0;
         break;
     }
+	return true;
+}
+
+bool VescSerial::getLock()
+{
+	if (_active != this && _request)
+		return false;
+
+	_active = this;
+	_serial.begin(_baud);
+	return true;
+}
+
+
+bool VescSerial::unlock()
+{
+	if (_active != this)
+		return false;
+	_serial.flush();
+	_serial.end();
+	_active = NULL;
+	_request = false;
+	return true;
 }

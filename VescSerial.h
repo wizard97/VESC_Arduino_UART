@@ -10,39 +10,48 @@
 #include "packet.h"
 #include "crc.h"
 
-#define VESC_BAUD_RATE 9600
+#define VESC_BAUD_RATE 38400
+
+#define debug Serial
 
 const char* bldc_interface_fault_to_string(mc_fault_code fault);
-
 
 class VescSerial
 {
 public:
-    VescSerial(SoftwareSerial &serial, void (*msgHandler)(VescSerial &vesc, COMM_PACKET_ID type, void *msg));
-    void begin(uint32_t baud = VESC_BAUD_RATE);
-    void service();
+    VescSerial(SoftwareSerial &serial, uint32_t baud, void (*msgHandler)(VescSerial &vesc, COMM_PACKET_ID type, void *msg));
+    bool service();
 
     //setters
-    void setDuty(float dutyCycle);
-    void setCurrent(float current);
-    void setCurrentBrake(float current);
-    void setRPM(uint32_t rpm);
-    void reboot();
+    bool setDuty(float dutyCycle);
+    bool setCurrent(float current);
+    bool setCurrentBrake(float current);
+    bool setRPM(uint32_t rpm);
+    bool reboot();
 
     //Getters, the msgHandler will be invoked when it suceeds
     //mc_values getValues() { return _values; }
-    void requestValues();
-    void requestVersion();
+    bool requestValues();
+    bool requestVersion();
     uint32_t getLastRecv() { return _lastRecv; }
+
+    static bool usingSerial() { return _active; }
 
 protected:
     void sendPacket(unsigned char *data, unsigned int len);
     void processPacket(unsigned char *data, unsigned int len);
+
+    bool getLock();
+    bool unlock();
+
+    static VescSerial *_active;; //mutex for SoftwareSerial
+    bool _request;
 private:
     SoftwareSerial _serial;
     PACKET_STATE_t _packet; // from packet.h
     uint32_t _timeout;
     uint32_t _lastRecv;
+    uint32_t _baud;
 
     //mc_values _values;
 
