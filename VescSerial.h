@@ -12,8 +12,6 @@
 
 #define VESC_BAUD_RATE 38400
 
-#define debug Serial
-
 const char* bldc_interface_fault_to_string(mc_fault_code fault);
 
 class VescSerial
